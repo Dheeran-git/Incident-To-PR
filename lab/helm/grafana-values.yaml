@@ -1,0 +1,28 @@
+adminUser: admin
+adminPassword: incident-to-pr-local
+persistence:
+  enabled: false
+service:
+  type: ClusterIP
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://incident-to-pr-prometheus-server.online-boutique.svc.cluster.local
+        isDefault: true
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://incident-to-pr-loki.observability.svc.cluster.local:3100

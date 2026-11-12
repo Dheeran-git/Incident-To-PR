@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: incident-to-pr-observer
+  namespace: online-boutique
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: incident-to-pr-observer
+  namespace: online-boutique
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-to-pr-observer
+  namespace: online-boutique
+subjects:
+  - kind: ServiceAccount
+    name: incident-to-pr-observer
+    namespace: online-boutique
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: incident-to-pr-observer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: incident-to-pr-argocd-status-observer
+  namespace: argocd
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    resourceNames: ["online-boutique"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-to-pr-argocd-status-observer
+  namespace: argocd
+subjects:
+  - kind: ServiceAccount
+    name: incident-to-pr-observer
+    namespace: online-boutique
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: incident-to-pr-argocd-status-observer

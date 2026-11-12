@@ -1,0 +1,9 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+httpx>=0.28,<1
+pydantic>=2.10,<3
+PyYAML>=6,<7
+kubernetes>=32,<35
+langgraph>=0.2,<2
+litellm>=1.70,<2
+python-dotenv>=1,<2

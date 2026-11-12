@@ -1,0 +1,60 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "kube_deployment_status_replicas_available{namespace=\"online-boutique\"}", "legendFormat": "{{deployment}}", "refId": "A"}],
+      "title": "Available replicas by deployment",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [{"expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"online-boutique\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A"}],
+      "title": "Container restarts in the last 5 minutes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "min": 0, "max": 1}, "overrides": []},
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8},
+      "id": 3,
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [{"expr": "up", "legendFormat": "{{job}} / {{instance}}", "refId": "A"}],
+      "title": "Scrape target health",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 10, "w": 16, "x": 8, "y": 8},
+      "id": 4,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"expr": "{namespace=\"online-boutique\"}", "refId": "A"}],
+      "title": "Online Boutique logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["incident-to-pr", "local-lab"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Incident-to-PR Lab",
+  "uid": "incident-to-pr-lab",
+  "version": 1
+}
