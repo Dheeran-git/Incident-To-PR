@@ -20,7 +20,7 @@ from ..integrations.github import GitHubClient, GitHubError
 from ..integrations.telemetry import kubernetes_evidence, loki_evidence, prometheus_evidence
 from ..database import add_event
 from .policy import RULE_VERSION, SECRET_PATTERNS, validate_proposal
-from .runtime_config import for_service, repository_config
+from .runtime_config import code_context_files, for_service, repository_config
 
 
 class IncidentState(TypedDict, total=False):
@@ -241,7 +241,7 @@ def _repository_for(action: str, service: str) -> tuple[str, tuple[str, ...]]:
     if action == "INFRA_FIX":
         return repos["gitops_repository"], for_service(settings.infra_context_files, service)
     if action == "CODE_FIX":
-        return repos["code_repository"], for_service(settings.code_context_files, service)
+        return repos["code_repository"], code_context_files(service)
     return "", ()
 
 

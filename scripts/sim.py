@@ -53,6 +53,7 @@ def main() -> int:
                "GITHUB_CODE_REPOSITORY": "sim-lab/online-boutique", "GITHUB_GITOPS_REPOSITORY": "sim-lab/online-boutique",
                "CODE_ALLOWED_PATHS": "src/$service/", "INFRA_ALLOWED_PATHS": "deploy/online-boutique/",
                "CODE_CONTEXT_FILES": "src/$service/main.go", "INFRA_CONTEXT_FILES": "deploy/online-boutique/$service.yaml",
+               "SERVICE_CONTEXT_MAP": str(ROOT / ".local" / "simulation-no-context-map.json"),
                "LLM_MODEL": "openai/rule-based-stub", "LLM_API_KEY": "simulated-key", "LLM_API_BASE": f"{sim}/llm/v1",
                "LLM_FALLBACK_MODEL": "", "ARGOCD_URL": f"{sim}/argocd", "ARGOCD_TOKEN": "simulated-token",
                "ARGOCD_APPLICATION": "online-boutique", "K8S_CONTEXT": "simulation-has-no-cluster",

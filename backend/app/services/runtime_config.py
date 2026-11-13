@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import re
+from functools import lru_cache
+from pathlib import Path
 from urllib.parse import urlparse
 
 from ..config import settings
@@ -58,3 +61,22 @@ def for_service(templates: tuple[str, ...], service: str) -> tuple[str, ...]:
         elif safe:
             expanded.append(template.replace("$service", safe))
     return tuple(expanded)
+
+
+@lru_cache(maxsize=4)
+def _load_context_map(path: Path) -> dict[str, tuple[str, ...]]:
+    try:
+        services = json.loads(path.read_text(encoding="utf-8")).get("services", {})
+        return {name: tuple(str(f).strip().strip("/") for f in entry.get("code", []) if isinstance(f, str) and f.strip())
+                for name, entry in services.items() if isinstance(entry, dict)}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def code_context_files(service: str) -> tuple[str, ...]:
+    """Source files offered to the model for a code fix: the per-service map first, templates otherwise."""
+    if SERVICE_NAME.fullmatch(service or ""):
+        mapped = _load_context_map(settings.service_context_map).get(service)
+        if mapped:
+            return mapped
+    return for_service(settings.code_context_files, service)

@@ -38,6 +38,7 @@ os.environ.update({
     "GITHUB_BASE_BRANCH": "main",
     "CODE_ALLOWED_PATHS": "src/$service/", "INFRA_ALLOWED_PATHS": "deploy/online-boutique/",
     "CODE_CONTEXT_FILES": "src/$service/main.go", "INFRA_CONTEXT_FILES": "deploy/online-boutique/$service.yaml",
+    "SERVICE_CONTEXT_MAP": str(_tmp / "no-map.json"),
     "LLM_MODEL": "openai/sim-stub", "LLM_API_KEY": "sim-key", "LLM_API_BASE": f"{SIM}/llm/v1",
     "LLM_FALLBACK_MODEL": "", "LLM_TRACE_ENABLED": "true",
     "ARGOCD_URL": f"{SIM}/argocd", "ARGOCD_TOKEN": "sim-token", "ARGOCD_APPLICATION": "online-boutique",

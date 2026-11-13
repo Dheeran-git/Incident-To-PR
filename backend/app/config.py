@@ -72,6 +72,9 @@ class Settings:
     infra_allowed_paths: tuple[str, ...] = _csv("INFRA_ALLOWED_PATHS", "deploy/online-boutique/")
     code_context_files: tuple[str, ...] = _csv("CODE_CONTEXT_FILES", "src/$service/main.go")
     infra_context_files: tuple[str, ...] = _csv("INFRA_CONTEXT_FILES", "deploy/online-boutique/$service.yaml")
+    # Optional per-service override of CODE_CONTEXT_FILES (JSON: {"services": {"<name>": {"code": [...]}}}).
+    service_context_map: Path = (lambda p: p if p.is_absolute() else ROOT_DIR / p)(
+        Path(os.getenv("SERVICE_CONTEXT_MAP", "lab/service-context.json")))
     max_patch_files: int = _int("MAX_PATCH_FILES", 3, 1)
     max_patch_bytes: int = _int("MAX_PATCH_BYTES", 200000, 1)
     argocd_url: str = os.getenv("ARGOCD_URL", "").rstrip("/")
