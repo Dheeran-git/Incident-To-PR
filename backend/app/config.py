@@ -42,8 +42,10 @@ class Settings:
     llm_model: str = os.getenv("LLM_MODEL", "")
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_api_base: str = os.getenv("LLM_API_BASE", "")
-    llm_timeout_seconds: int = _int("LLM_TIMEOUT_SECONDS", 45, 1)
-    llm_max_tokens: int = _int("LLM_MAX_TOKENS", 3000, 256)
+    llm_timeout_seconds: int = _int("LLM_TIMEOUT_SECONDS", 120, 1)
+    llm_max_tokens: int = _int("LLM_MAX_TOKENS", 16000, 256)
+    # Empty = automatic: 0 for most providers, omitted for models that reject sampling parameters.
+    llm_temperature: str = os.getenv("LLM_TEMPERATURE", "")
     llm_fallback_model: str = os.getenv("LLM_FALLBACK_MODEL", "")
     llm_fallback_api_key: str = os.getenv("LLM_FALLBACK_API_KEY", "")
     llm_fallback_api_base: str = os.getenv("LLM_FALLBACK_API_BASE", "")

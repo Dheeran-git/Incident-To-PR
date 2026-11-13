@@ -69,6 +69,21 @@ def _bounded_json(payload: dict[str, Any], limit: int) -> str:
     return text
 
 
+def _temperature_for(model: str) -> float | None:
+    """Sampling temperature to send, or None to omit it.
+
+    Current Claude models reject non-default sampling parameters with a 400, so nothing is sent
+    for them unless LLM_TEMPERATURE is set explicitly.
+    """
+    configured = settings.llm_temperature.strip()
+    if configured:
+        try:
+            return float(configured)
+        except ValueError:
+            return None
+    return None if "claude" in model.lower() else 0.0
+
+
 def _redact(value: Any) -> Any:
     if isinstance(value, str):
         value = value[:6000]
@@ -87,8 +102,7 @@ async def _model_json(system: str, user: str, incident_id: str, stage: str) -> d
         raise WorkflowUnavailable("Model provider is not configured; incident remains open and no change is proposed")
     kwargs: dict[str, Any] = {"model": settings.llm_model, "api_key": settings.llm_api_key,
                               "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                              "temperature": 0, "max_tokens": settings.llm_max_tokens,
-                              "timeout": settings.llm_timeout_seconds}
+                              "max_tokens": settings.llm_max_tokens, "timeout": settings.llm_timeout_seconds}
     if settings.llm_api_base:
         kwargs["api_base"] = settings.llm_api_base
     if any(pattern.search(user) for pattern in SECRET_PATTERNS):
@@ -103,6 +117,10 @@ async def _model_json(system: str, user: str, incident_id: str, stage: str) -> d
     result = None
     for model, api_key, api_base in attempts:
         kwargs["model"] = model
+        kwargs.pop("temperature", None)
+        temperature = _temperature_for(model)
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         kwargs["api_key"] = api_key
         if api_base:
             kwargs["api_base"] = api_base
@@ -111,7 +129,7 @@ async def _model_json(system: str, user: str, incident_id: str, stage: str) -> d
         if settings.llm_trace_enabled:
             add_event(incident_id, f"model:{stage}", "llm.request", {
                 "model": model, "messages": kwargs["messages"],
-                "temperature": kwargs["temperature"], "max_tokens": kwargs["max_tokens"]})
+                "temperature": kwargs.get("temperature"), "max_tokens": kwargs["max_tokens"]})
         try:
             result = await acompletion(**kwargs)
             break
@@ -123,7 +141,13 @@ async def _model_json(system: str, user: str, incident_id: str, stage: str) -> d
     try:
         if result is None:
             raise ValueError("model provider returned no response")
-        content = result.choices[0].message.content or ""
+        choice = result.choices[0]
+        content = choice.message.content or ""
+        finish = getattr(choice, "finish_reason", None)
+        if finish == "length":
+            raise ModelError(f"Model output for the {stage} stage was cut off at LLM_MAX_TOKENS; raise it and retry. No change was proposed")
+        if finish in {"refusal", "content_filter"}:
+            raise ModelError(f"The model declined the {stage} request; no change was proposed")
         if settings.llm_trace_enabled:
             response_content = content
             if any(pattern.search(response_content) for pattern in SECRET_PATTERNS):
@@ -140,6 +164,8 @@ async def _model_json(system: str, user: str, incident_id: str, stage: str) -> d
         if not isinstance(parsed, dict):
             raise ValueError("model response must be a JSON object")
         return parsed
+    except ModelError:
+        raise
     except Exception as exc:
         raise ModelError(f"Model response for the {stage} stage was not valid JSON; no change was proposed") from exc
 
