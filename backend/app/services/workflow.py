@@ -97,20 +97,41 @@ def _redact(value: Any) -> Any:
     return value
 
 
+# Simulation-lab only: a model and key typed into the dashboard. Held in memory, never persisted or logged.
+session_model: dict[str, str] = {}
+
+
+def active_model() -> tuple[str, str, str]:
+    if session_model:
+        return session_model["model"], session_model["api_key"], ""
+    return settings.llm_model, settings.llm_api_key, settings.llm_api_base
+
+
+async def check_model(model: str, api_key: str) -> None:
+    """One tiny request to confirm the model id and key work. Raises the provider error otherwise."""
+    kwargs: dict[str, Any] = {"model": model, "api_key": api_key, "max_tokens": 512, "timeout": 30,
+                              "messages": [{"role": "user", "content": "Reply with the single word: ok"}]}
+    temperature = _temperature_for(model)
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    await acompletion(**kwargs)
+
+
 async def _model_json(system: str, user: str, incident_id: str, stage: str) -> dict[str, Any]:
-    if not settings.llm_model or not settings.llm_api_key:
+    llm_model, llm_api_key, llm_api_base = active_model()
+    if not llm_model or not llm_api_key:
         raise WorkflowUnavailable("Model provider is not configured; incident remains open and no change is proposed")
-    kwargs: dict[str, Any] = {"model": settings.llm_model, "api_key": settings.llm_api_key,
+    kwargs: dict[str, Any] = {"model": llm_model, "api_key": llm_api_key,
                               "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
                               "max_tokens": settings.llm_max_tokens, "timeout": settings.llm_timeout_seconds}
-    if settings.llm_api_base:
-        kwargs["api_base"] = settings.llm_api_base
+    if llm_api_base:
+        kwargs["api_base"] = llm_api_base
     if any(pattern.search(user) for pattern in SECRET_PATTERNS):
         add_event(incident_id, f"model:{stage}", "llm.blocked_sensitive_context", {
             "input_sha256": hashlib.sha256(user.encode("utf-8")).hexdigest()})
         raise WorkflowUnavailable("Model request blocked because repository or incident context matched a credential pattern")
-    attempts = [(settings.llm_model, settings.llm_api_key, settings.llm_api_base)]
-    if settings.llm_fallback_model and settings.llm_fallback_model != settings.llm_model:
+    attempts = [(llm_model, llm_api_key, llm_api_base)]
+    if not session_model and settings.llm_fallback_model and settings.llm_fallback_model != settings.llm_model:
         attempts.append((settings.llm_fallback_model,
                          settings.llm_fallback_api_key or settings.llm_api_key,
                          settings.llm_fallback_api_base or settings.llm_api_base))
@@ -155,7 +176,7 @@ async def _model_json(system: str, user: str, incident_id: str, stage: str) -> d
             add_event(incident_id, f"model:{stage}", "llm.response", {
                 "model": getattr(result, "model", None) or kwargs["model"],
                 "response_id": getattr(result, "id", None), "content": response_content,
-                "fallback": kwargs["model"] != settings.llm_model,
+                "fallback": kwargs["model"] != llm_model,
                 "usage": getattr(result, "usage", None).model_dump() if getattr(result, "usage", None) else None})
         match = re.search(r"\{[\s\S]*\}", content)
         if not match:

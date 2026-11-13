@@ -19,8 +19,8 @@ from .integrations.argocd import application_status
 from .integrations.github import GitHubClient, GitHubError
 from .integrations.telemetry import integration_status, prometheus_fleet, prometheus_health, prometheus_health_window
 from .schemas import (AlertmanagerPayload, EscalateRequest, IncidentCreate, MonitorConfigUpdate,
-                      RepositoryConfigUpdate, ReviewRequest)
-from .services import monitor
+                      RepositoryConfigUpdate, ReviewRequest, SessionModelUpdate)
+from .services import monitor, workflow
 from .services.incident_ops import ANALYZABLE_STATUSES, start_analysis, wait_for_background_analyses
 from .services.monitor import monitor_loop
 from .services.policy import MAX_REPLICAS, MIN_REPLICAS, RULE_VERSION
@@ -88,13 +88,34 @@ async def get_configuration() -> dict[str, Any]:
     return {"code_repository": repos["code_repository"], "gitops_repository": repos["gitops_repository"],
             "github_token_configured": bool(settings.github_token),
             "model_configured": bool(settings.llm_model and settings.llm_api_key),
-            "model": settings.llm_model or None,
+            "model": workflow.active_model()[0] or None,
+            "model_source": "session" if workflow.session_model else "configuration",
             "monitoring": {**monitoring, "poll_seconds": monitor.POLL_SECONDS,
                            "consecutive_polls": monitor.CONSECUTIVE_UNHEALTHY_POLLS, "last_poll": monitor.last_poll},
             "namespace": settings.k8s_namespace, "base_branch": settings.github_base_branch,
             "simulation": settings.simulation, "environment": settings.app_env,
             "verification_window_minutes": settings.verification_window_minutes,
             "evidence_max_age_seconds": settings.evidence_max_age_seconds}
+
+
+@app.put("/api/v1/configuration/model")
+async def set_session_model(payload: SessionModelUpdate) -> dict[str, Any]:
+    """Simulation lab only: use a real model for this process's lifetime. The key is kept in memory only."""
+    if not settings.simulation:
+        raise HTTPException(403, "Outside the simulation lab the model key is configured in .env, never through the browser")
+    model, api_key = payload.model.strip(), payload.api_key.strip()
+    try:
+        await workflow.check_model(model, api_key)
+    except Exception as exc:
+        raise HTTPException(422, f"The provider rejected the test request ({type(exc).__name__}). Check the model id and the key.") from exc
+    workflow.session_model.update({"model": model, "api_key": api_key})
+    return {"model": model, "model_source": "session"}
+
+
+@app.delete("/api/v1/configuration/model")
+async def clear_session_model() -> dict[str, Any]:
+    workflow.session_model.clear()
+    return {"model": settings.llm_model or None, "model_source": "configuration"}
 
 
 @app.get("/api/v1/fleet")

@@ -44,7 +44,7 @@ export type Integrations = Record<string, Integration>;
 
 export type Configuration = {
   code_repository: string; gitops_repository: string; github_token_configured: boolean; model_configured: boolean;
-  model?: string | null; namespace: string; base_branch: string; simulation: boolean; environment: string;
+  model?: string | null; model_source?: string; namespace: string; base_branch: string; simulation: boolean; environment: string;
   verification_window_minutes: number; evidence_max_age_seconds: number;
   monitoring: {
     enabled: boolean; auto_analyze: boolean; poll_seconds: number; consecutive_polls: number;

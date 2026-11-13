@@ -371,3 +371,6 @@ select option { background: var(--surface-solid); }
   .card { padding: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.model-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: end; } .model-form .row { grid-column: 1 / -1; justify-content: flex-start; margin-top: 0; }
+@media (max-width: 720px) { .model-form { grid-template-columns: minmax(0, 1fr); } }

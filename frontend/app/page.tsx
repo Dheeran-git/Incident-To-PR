@@ -120,7 +120,7 @@ export default function Home() {
     </aside>
 
     <div className="main">
-      {simulation && <div className="sim-banner"><Icon name="lab" size={16} /><span><b>Simulation lab.</b> Synthetic telemetry, a rule-based stub model and an in-memory GitHub/Argo CD. Nothing here is a real repair result.</span></div>}
+      {simulation && <div className="sim-banner"><Icon name="lab" size={16} /><span><b>Simulation lab.</b> Synthetic telemetry, {configuration?.model_source === "session" ? <>decisions by <b>{configuration.model}</b>,</> : "a rule-based stub model"} and an in-memory GitHub/Argo CD. Nothing here is a real repair result.</span></div>}
       {online === false && <div className="sim-banner bad"><Icon name="info" size={16} /><span><b>The control-plane API is not reachable.</b> Start it, and this page reconnects automatically.</span></div>}
 
       <header className="topbar">
@@ -154,7 +154,7 @@ export default function Home() {
       </div>}
 
       {view === "setup" && <Setup configuration={configuration} integrations={integrations} policy={policy} busy={busy} run={run} />}
-      {view === "lab" && simulation && <SimLab busy={busy} run={run} />}
+      {view === "lab" && simulation && <SimLab busy={busy} run={run} configuration={configuration} />}
 
       <footer className="footer"><span>Incident-to-PR · Phase I research prototype</span><span>The application never merges a pull request and never writes to Kubernetes.</span></footer>
     </div>

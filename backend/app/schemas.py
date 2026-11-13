@@ -39,3 +39,8 @@ class RepositoryConfigUpdate(BaseModel):
 class MonitorConfigUpdate(BaseModel):
     enabled: bool
     auto_analyze: bool = False
+
+
+class SessionModelUpdate(BaseModel):
+    model: str = Field(min_length=3, max_length=120, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/-]+$")
+    api_key: str = Field(min_length=8, max_length=400)

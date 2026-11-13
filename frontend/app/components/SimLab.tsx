@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, post } from "../lib/api";
-import type { SimState } from "../lib/types";
+import { put } from "../lib/api";
+import type { Configuration, SimState } from "../lib/types";
 import { Badge, Card, Empty, Icon } from "./ui";
 
 const KIND_TITLE: Record<string, string> = { capacity: "Capacity (infrastructure)", code_bug: "Code bug", ambiguous: "Ambiguous" };
 const KIND_EXPECT: Record<string, string> = { capacity: "Expected: INFRA_FIX → replica PR", code_bug: "Expected: CODE_FIX → source PR", ambiguous: "Expected: escalate to human" };
 
-export function SimLab({ busy, run }: { busy: boolean; run: (message: string, operation: () => Promise<unknown>) => Promise<void> }) {
+export function SimLab({ busy, run, configuration }: { busy: boolean; configuration: Configuration | null; run: (message: string, operation: () => Promise<unknown>) => Promise<void> }) {
+  const [model, setModel] = useState("anthropic/claude-haiku-5-5");
+  const [apiKey, setApiKey] = useState("");
+  const realModel = configuration?.model_source === "session";
   const [state, setState] = useState<SimState | null>(null);
   const [service, setService] = useState("shippingservice");
   const [error, setError] = useState("");
@@ -41,6 +45,18 @@ export function SimLab({ busy, run }: { busy: boolean; run: (message: string, op
       </li>)}</ul>
       <div className="row"><Badge tone={state.argocd.sync.status === "Synced" ? "ok" : "warn"}>Argo CD · {state.argocd.sync.status} / {state.argocd.health.status}</Badge>
         <button className="btn ghost small" disabled={busy} onClick={() => { if (window.confirm("Reset the simulated cluster, repository and pull requests?")) void act("Simulation reset to a healthy baseline.", () => post("/sim/reset")); }}><Icon name="refresh" size={14} />Reset world</button></div>
+    </Card>
+
+    <Card eyebrow="Model" title={realModel ? "Using a real model" : "Using the rule-based stub"} className="span-2"
+      action={<Badge tone={realModel ? "violet" : "idle"}>{configuration?.model || "—"}</Badge>}>
+      <p className="muted">{realModel ? "Diagnosis, decision and patch now come from this model. Telemetry, GitHub and Argo CD are still simulated. Incident text, synthetic logs and synthetic source files are sent to the provider."
+        : "To have a real LLM make the decisions, enter a LiteLLM model id and your API key. The key is sent to this lab's API over this page, checked with one small request, kept in memory only, and forgotten when the lab stops."}</p>
+      <form className="form model-form" autoComplete="off" onSubmit={event => { event.preventDefault(); void run(`Now using ${model}.`, async () => { await put("/api/v1/configuration/model", { model, api_key: apiKey }); setApiKey(""); }); }}>
+        <label>Model id<input value={model} onChange={e => setModel(e.target.value)} placeholder="anthropic/claude-haiku-5-5" required /></label>
+        <label>API key<input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-ant-…" autoComplete="new-password" required /></label>
+        <div className="row"><button className="btn primary" disabled={busy || !apiKey.trim()}>{realModel ? "Replace model" : "Use this model"}</button>
+          {realModel && <button type="button" className="btn ghost" disabled={busy} onClick={() => void run("Back on the rule-based stub.", () => api("/api/v1/configuration/model", { method: "DELETE" }))}>Back to the stub</button>}</div>
+      </form>
     </Card>
 
     <Card eyebrow="Step 2 · the human reviewer" title="Simulated GitHub pull requests" className="span-2">

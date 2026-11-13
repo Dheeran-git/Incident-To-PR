@@ -262,3 +262,17 @@ def test_oversized_context_is_refused_not_truncated():
 def test_evidence_redaction():
     redacted = workflow._redact({"log": "Authorization: Bearer abc.def.ghi password=hunter2 api_key: zzz"})
     assert "abc.def.ghi" not in redacted["log"] and "hunter2" not in redacted["log"] and "zzz" not in redacted["log"]
+
+
+def test_session_model_is_simulation_only_validated_and_never_echoed(api, override):
+    from app.services import workflow as wf
+    bad = api.put("/api/v1/configuration/model", json={"model": "openai/sim-stub", "api_key": "x"})
+    assert bad.status_code == 422
+    import os
+    unreachable = api.put("/api/v1/configuration/model", json={"model": "anthropic/claude-haiku-5-5", "api_key": "not-a-real-key-123"})
+    assert unreachable.status_code == 422 and wf.session_model == {}
+    assert "not-a-real-key-123" not in unreachable.text
+    override(app_env="production")
+    assert api.put("/api/v1/configuration/model", json={"model": "a/b", "api_key": "12345678"}).status_code == 403
+    assert wf.session_model == {}
+    assert api.delete("/api/v1/configuration/model").json()["model_source"] == "configuration"
