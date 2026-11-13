@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 from ..config import settings
 from ..database import get_app_setting
 
+SERVICE_NAME = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
+
 
 def normalize_github_repository(value: str) -> str:
     raw = value.strip()
@@ -19,9 +21,10 @@ def normalize_github_repository(value: str) -> str:
         if len(parts) != 2:
             raise ValueError("A repository link must point directly to https://github.com/OWNER/REPOSITORY.")
         owner, repository = parts
-        if repository.lower().endswith(".git"):
-            repository = repository[:-4]
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", owner) or not re.fullmatch(r"[A-Za-z0-9_.-]+", repository):
+    if repository.lower().endswith(".git"):
+        repository = repository[:-4]
+    if (not re.fullmatch(r"[A-Za-z0-9_.-]+", owner) or not re.fullmatch(r"[A-Za-z0-9_.-]+", repository)
+            or owner in {".", ".."} or repository in {".", ".."}):
         raise ValueError("Repository owner or name contains unsupported characters.")
     return f"{owner}/{repository}"
 
@@ -38,3 +41,20 @@ def auto_monitor_config() -> dict[str, bool]:
         "enabled": get_app_setting("auto_monitor_enabled", "false").lower() == "true",
         "auto_analyze": get_app_setting("auto_analyze_enabled", "false").lower() == "true",
     }
+
+
+def for_service(templates: tuple[str, ...], service: str) -> tuple[str, ...]:
+    """Expand `$service` in configured paths.
+
+    The service name comes from an incident report or alert, so it is untrusted: it is substituted
+    only when it is a plain Kubernetes DNS label. Otherwise templated entries are dropped, which
+    leaves the allowlist/context empty and makes the workflow fail closed.
+    """
+    safe = service if SERVICE_NAME.fullmatch(service or "") else None
+    expanded = []
+    for template in templates:
+        if "$service" not in template:
+            expanded.append(template)
+        elif safe:
+            expanded.append(template.replace("$service", safe))
+    return tuple(expanded)

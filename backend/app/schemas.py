@@ -20,9 +20,14 @@ class ReviewRequest(BaseModel):
     comment: str = Field(default="", max_length=2000)
 
 
+class EscalateRequest(BaseModel):
+    reviewer: ShortText
+    comment: str = Field(default="", max_length=2000)
+
+
 class AlertmanagerPayload(BaseModel):
     receiver: str | None = None
-    status: str
+    status: str = "firing"
     alerts: list[dict[str, Any]] = Field(default_factory=list)
 
 
