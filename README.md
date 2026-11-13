@@ -1,6 +1,6 @@
 # Incident-to-PR
 
-> **Status (13 Nov 2026):** The Phase 9 *platform path* is implemented and tested: a Next.js control room, a FastAPI/LangGraph control plane, manual and automatic incident intake, a deterministic policy gate, human approval, PR creation, and sustained-recovery verification after a merge and Argo CD sync. A 138-test suite and a browser smoke test exercise that path end to end against a **synthetic simulation lab**. The live path against a real cluster still needs your own GitHub repository/token and model key. Several research-plan exit criteria for Phases 1–9 are **not** met (see the phase audit below). No repair result is claimed.
+> **Status (13 Nov 2026):** The Phase 9 *platform path* is implemented and tested: a Next.js control room, a FastAPI/LangGraph control plane, manual and automatic incident intake, a deterministic policy gate, human approval, PR creation, and sustained-recovery verification after a merge and Argo CD sync. A 140-test suite and a browser smoke test exercise that path end to end against a **synthetic simulation lab**. The live path against a real cluster still needs your own GitHub repository/token and model key. Several research-plan exit criteria for Phases 1–9 are **not** met (see the phase audit below). No repair result is claimed.
 
 This README describes both the implemented system and the remaining setup needed for a cloneable live run. The application never merges a PR and never writes to Kubernetes. It proposes; the policy gate decides; human review and repository branch protection control merge; Argo CD reconciles only after merge.
 
@@ -20,13 +20,38 @@ Open `http://127.0.0.1:3000`. The launcher starts three local processes: the sim
 - **Manual mode:** press *Report incident*, then *Analyze incident*.
 - Approve the proposal, open the pull request, merge it on the stand-in GitHub page (that is the human reviewer's step), press *Refresh status*, then *Check recovery* until the 2-minute window passes.
 
-**Everything in the simulation is synthetic.** Telemetry is generated, the "model" is a deterministic rule-based stub, and pull requests exist only in memory. It proves that the workflow, guards and UI function; it is not evidence that real faults are diagnosed or repaired. The verification floors (15 minutes, 10 samples) can only be lowered when `APP_ENV=simulation`.
+**Everything in the simulation is synthetic.** Telemetry is generated, the default "model" is a deterministic rule-based stub, and pull requests exist only in memory. It proves that the workflow, guards and UI function; it is not evidence that real faults are diagnosed or repaired. The verification floors (15 minutes, 10 samples) can only be lowered when `APP_ENV=simulation`.
+
+### Use a real LLM in the simulation lab
+
+The lab can take its diagnosis, decision and patch from a real model while telemetry, GitHub and Argo CD stay simulated. Incident text, synthetic logs and synthetic source files are then sent to that provider.
+
+- **In the dashboard (simplest):** *Simulation lab* → **Model** card → enter a LiteLLM model id (for example `anthropic/claude-haiku-5-5`) and your API key → **Use this model**. The key is checked with one small request, kept in the API's memory only (never written to disk or the audit trail), and forgotten when the lab stops. This endpoint exists only when `APP_ENV=simulation`.
+- **From `.env`:** set `LLM_MODEL` and `LLM_API_KEY`, then start with `python scripts/sim.py --fresh --real-model`.
+
+Claude models are supported through LiteLLM's `anthropic/` prefix. Sampling temperature is omitted for them automatically (current Claude models reject it); set `LLM_TEMPERATURE` to override for other providers. `LLM_MAX_TOKENS` defaults to 16000 because thinking tokens count against it.
+
+### Run it in the browser with GitHub Codespaces
+
+`.devcontainer/devcontainer.json` installs the dependencies and starts the lab when a codespace is created on this branch; open the forwarded port 3000. This configuration has not been exercised in Codespaces yet.
+
+## Demo guide and partial results
+
+- [`docs/DEMO.md`](docs/DEMO.md) — a 6–8 minute walkthrough with what to click and say, likely questions, and fallbacks.
+- [`results/partial-results.md`](results/partial-results.md) — the latest generated report: decision matrix over 14 synthetic scenarios, automatic detection latency, one verified recovery, one masking case that is correctly not verified, and the policy/guard test counts. The report names the model that produced the decisions; with the stub it validates the pipeline and guards, **not** diagnostic accuracy.
+
+Regenerate it with the lab running:
+
+```bash
+python scripts/evaluate.py --with-tests     # full run, about 8 minutes
+python scripts/evaluate.py --quick          # decision matrix only
+```
 
 ## Tests
 
 ```bash
 .venv/bin/pip install -r backend/requirements-dev.txt
-cd backend && ../.venv/bin/python -m pytest -q             # 138 tests, about 25 s
+cd backend && ../.venv/bin/python -m pytest -q             # 140 tests, about 30 s
 cd frontend && npm ci && npm run typecheck && npm run build
 node frontend/e2e/smoke.mjs                                 # browser flow; needs the simulation lab running and Playwright
 ```
@@ -473,6 +498,7 @@ The current executable commands and their real behavior are:
 | `scripts/port-forward.ps1` / `scripts/port-forward-stop.ps1` | Start or stop tracked loopback-only forwards for Prometheus, Loki, Grafana, and Argo CD. Stop checks the saved PID command before terminating it. |
 | `scripts/dev.ps1` / `scripts/dev-stop.ps1` | Start or stop the FastAPI and Next.js development processes. Logs and PID records live under ignored `.local/`. |
 | `scripts/sim.py` | Cross-platform. Start the synthetic simulation lab (simulator, API, dashboard) with every integration pointed at the simulator; real credentials in `.env` are not used. |
+| `scripts/evaluate.py` | Run the scenario matrix against a running simulation lab and write `results/partial-results.md` and `.json`. Refuses to run outside the simulation lab. |
 | `scripts/setup-fork.py` | Cross-platform. Add `deploy/online-boutique/` to your Online Boutique fork and record the repository in `.env`. Never handles tokens. |
 | `scripts/prepare-gitops.py` | Split the vendored Online Boutique manifest into the per-Deployment GitOps layout in `lab/gitops/online-boutique/`. |
 

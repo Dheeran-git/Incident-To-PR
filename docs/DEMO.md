@@ -15,6 +15,7 @@ python -m venv .venv
 
 Wait for `Simulation lab starting — dashboard: http://127.0.0.1:3000`, then open that address.
 
+- **To demo with a real LLM** (for example Claude Haiku 5.5): in the dashboard open *Simulation lab* → **Model** card, enter `anthropic/claude-haiku-5-5` and your API key, press **Use this model**. The banner then names the model. Re-enter it after every restart. If it misbehaves, press **Back to the stub**.
 - Do one full rehearsal, then stop with **Ctrl+C** and start again with `--fresh` so the queue is empty.
 - Always stop with Ctrl+C in that terminal. If a restart says the database is in use, an old run is still alive: close its terminal first.
 - Keep `results/partial-results.md` open in a second tab (GitHub renders the tables).
@@ -24,7 +25,7 @@ Wait for `Simulation lab starting — dashboard: http://127.0.0.1:3000`, then op
 ## What to say up front (30 seconds)
 
 > "Incident-to-PR turns a runtime incident into a reviewed pull request. Agents diagnose and propose; a deterministic policy gate checks the actual diff; a human approves; GitOps deploys; and recovery is verified over a sustained window. The agents never write to the cluster and can never merge.
-> What you'll see runs the real control plane against a **simulation lab** — generated telemetry, a rule-based stand-in for the LLM, and an in-memory GitHub and Argo CD. That lets me show the whole workflow reliably today. Real-cluster and real-model evaluation is Phase 3."
+> What you'll see runs the real control plane against a **simulation lab** — generated telemetry, a rule-based stand-in for the LLM *(if you entered a real model: "with Claude Haiku 5.5 making the decisions")*, and an in-memory GitHub and Argo CD. That lets me show the whole workflow reliably today. Real-cluster and real-model evaluation is Phase 3."
 
 Saying this first matters: the yellow banner says the same thing, and evaluators trust a demo more when its limits are stated before they have to ask.
 
@@ -64,19 +65,18 @@ What to highlight, and how to phrase it:
 
 **Phrase section 1 carefully.** Say: "These 14 cases validate the pipeline and its guards end to end. The decisions come from a rule-based stand-in written alongside the synthetic faults, so this is not a diagnostic-accuracy number — measuring that with a real LLM on real cluster faults is Phase 3." Do not present 14/14 as model accuracy; an evaluator who asks one question would find out, and the honest framing is the stronger one.
 
-If you have a model key and a few spare minutes before the demo, you can get decisions from a real LLM on the same synthetic faults (put `LLM_MODEL` and `LLM_API_KEY` in `.env` first):
+If you entered a real model in the dashboard and have a few spare minutes before the demo, regenerate the decision matrix with that model's decisions (this resets the simulated cluster, so never run it during the demo):
 
 ```powershell
-.\.venv\Scripts\python scripts\sim.py --fresh --real-model
 .\.venv\Scripts\python scripts\evaluate.py --quick
 ```
 
-The report then names that model. Only do this if you have time to read the output before presenting it.
+The report then names that model, and section 1 becomes a real measurement of an LLM on synthetic faults. Read the output before presenting it, and report whatever it shows.
 
 ## Likely questions
 
 - **"Is this running on a real cluster?"** Not in this demo. The kind lab scripts (Online Boutique, Prometheus, Loki, Grafana, Argo CD) are in the repo; the live path needs a fork and credentials and is the first Phase 3 task.
-- **"Is the AI real?"** The integration is real — LangGraph and LiteLLM call an OpenAI-compatible endpoint. In the demo that endpoint is a deterministic stub so the run is reproducible. Swapping in a real model is a configuration change.
+- **"Is the AI real?"** The integration is real — LangGraph and LiteLLM call the provider's API. With the stub, that endpoint is a deterministic stand-in so the run is reproducible. With a real model entered in the lab, the diagnosis, decision and patch come from that model; only the telemetry and GitHub are simulated.
 - **"What stops the model doing something dangerous?"** Four layers that don't depend on the model: it only sees allowlisted files; the gate checks the real diff (infrastructure changes are limited to one field, replicas 1–10); a human must approve; the bot can only open a PR, and the cluster credential is read-only.
 - **"What happens if the model is wrong?"** A wrong action that contradicts the diagnosis is overridden to escalation; a wrong but plausible patch is caught either by the reviewer or by verification — the masking case shows the second.
 - **"What's left?"** The fault lab (14 faults on the real cluster), an independent hidden-test evaluator, baselines, authentication and roles, automated rollback, and the final evaluation. The README has a phase-by-phase audit.
