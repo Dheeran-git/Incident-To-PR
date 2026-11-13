@@ -173,3 +173,24 @@ def test_repository_links_are_normalized(value, expected):
 def test_invalid_repository_links_are_rejected(value):
     with pytest.raises(ValueError):
         normalize_github_repository(value)
+
+
+def test_shipped_service_context_map_is_well_formed_and_inside_each_service_allowlist(override):
+    import json
+    from app.config import ROOT_DIR
+    from app.services import runtime_config
+
+    path = ROOT_DIR / "lab" / "service-context.json"
+    services = json.loads(path.read_text())["services"]
+    assert len(services) == 11
+    override(service_context_map=path)
+    runtime_config._load_context_map.cache_clear()
+    for service, entry in services.items():
+        files = runtime_config.code_context_files(service)
+        assert files == tuple(entry["code"]) and 1 <= len(files) <= 4
+        for file in files:
+            assert validate_proposal(CODE, code(path=file), service)["allowed"] is True, file
+    # Unknown or unsafe service names fall back to the templates / nothing.
+    assert runtime_config.code_context_files("redis-cart") == ("src/redis-cart/main.go",)
+    assert runtime_config.code_context_files("../..") == ()
+    runtime_config._load_context_map.cache_clear()

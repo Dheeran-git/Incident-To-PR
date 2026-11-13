@@ -61,11 +61,21 @@ CI (`.github/workflows/ci.yml`) runs the backend suite and the frontend typechec
 
 Yes, for the live path. The bot pushes a branch and opens a pull request, so it needs a repository your token can write to; it cannot do that on `GoogleCloudPlatform/microservices-demo`.
 
-1. Fork `GoogleCloudPlatform/microservices-demo` and check out tag `v0.10.7` as your `main` (the lab runs that release).
-2. Add the deployment manifests to it: copy `lab/gitops/online-boutique/` from this repository to `deploy/online-boutique/` in the fork. That directory holds one single-document file per Deployment (`shippingservice.yaml`, …), which is the only shape the infrastructure policy accepts, plus `base.yaml` and a self-contained `kustomization.yaml`. Regenerate it with `python scripts/prepare-gitops.py`.
-3. One fork can serve as both the code and the GitOps repository. Use a second repository only if you want them separated.
-4. Create a fine-grained token limited to that fork with **Contents: read/write** and **Pull requests: read/write**; put it in `.env` as `GITHUB_TOKEN`. Set `GITHUB_GITOPS_REPOSITORY=you/microservices-demo` and re-run `lab-up.ps1` so Argo CD deploys from the fork.
-5. Protect `main` on the fork (pull request required, no bypass for the token's owner where possible).
+1. On GitHub, open `GoogleCloudPlatform/microservices-demo` and press **Fork** (keep the name `microservices-demo`).
+2. From this repository, run the setup script with your fork's name. It uses the git login already on your computer, adds `deploy/online-boutique/` to the fork in one commit, and writes the repository name into `.env`:
+
+   ```powershell
+   .\.venv\Scripts\python scripts\setup-fork.py YOUR_USER/microservices-demo
+   ```
+
+   Add `--pin` on a fresh fork to move its `main` to the `v0.10.7` tag the lab runs (this force-pushes the fork's `main`). `--dry-run` shows what would happen without pushing.
+3. Create a fine-grained token (GitHub → Settings → Developer settings → Fine-grained tokens) limited to **only that fork**, with **Contents: read and write** and **Pull requests: read and write**. Paste it into `.env` as `GITHUB_TOKEN=`. Set `LLM_MODEL` and `LLM_API_KEY` there too. Never commit `.env` or paste these values into a chat.
+4. Run `.\scripts\lab-up.ps1` so Argo CD deploys from the fork, then `.\scripts\port-forward.ps1` and `.\scripts\dev.ps1`.
+5. Protect `main` on the fork (pull request required).
+
+One fork serves as both the code and the GitOps repository. The source files offered to the model for each service are listed in `lab/service-context.json` (verified against `v0.10.7`), so `CODE_CONTEXT_FILES` needs no editing for Online Boutique.
+
+**A limit to know before you test a code fix:** the lab runs Google's prebuilt `v0.10.7` images. A merged *infrastructure* PR (replica count) is deployed by Argo CD and can be verified. A merged *code* PR changes source in your fork but nothing rebuilds or redeploys an image, so the running service does not change and verification will not pass. Closing that loop needs an image build pipeline in the fork, which is not part of this prototype.
 
 ## Current implementation and live demo
 
@@ -463,6 +473,7 @@ The current executable commands and their real behavior are:
 | `scripts/port-forward.ps1` / `scripts/port-forward-stop.ps1` | Start or stop tracked loopback-only forwards for Prometheus, Loki, Grafana, and Argo CD. Stop checks the saved PID command before terminating it. |
 | `scripts/dev.ps1` / `scripts/dev-stop.ps1` | Start or stop the FastAPI and Next.js development processes. Logs and PID records live under ignored `.local/`. |
 | `scripts/sim.py` | Cross-platform. Start the synthetic simulation lab (simulator, API, dashboard) with every integration pointed at the simulator; real credentials in `.env` are not used. |
+| `scripts/setup-fork.py` | Cross-platform. Add `deploy/online-boutique/` to your Online Boutique fork and record the repository in `.env`. Never handles tokens. |
 | `scripts/prepare-gitops.py` | Split the vendored Online Boutique manifest into the per-Deployment GitOps layout in `lab/gitops/online-boutique/`. |
 
 The following research/evaluation tools are **not implemented yet**: independent hidden regression evaluator, mutation-testing harness, held-out fault suite, preregistered analysis runner, sample-size/power calculator, ORCA/GuardedAct baseline adapters, dedicated fault injector/resetter, and research-report generator. The plan in sections 5–10 describes these as future work; do not read them as shipped commands or completed experiments. No automated rollback or auto-merge command exists. Keep all credentials local or in a proper secret store; never commit `.env`, observer tokens, model API keys, or GitHub tokens.
