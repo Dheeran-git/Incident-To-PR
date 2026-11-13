@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--api-port", type=int, default=8000)
     parser.add_argument("--sim-port", type=int, default=9900)
     parser.add_argument("--host", default="127.0.0.1", help="bind address for the dashboard (API and simulator stay on loopback)")
+    parser.add_argument("--real-model", action="store_true", help="use LLM_MODEL / LLM_API_KEY from .env or the environment instead of the rule-based stub (telemetry stays synthetic)")
     parser.add_argument("--fresh", action="store_true", help="delete the simulation database first")
     args = parser.parse_args()
 
@@ -38,7 +39,12 @@ def main() -> int:
     database = ROOT / "data" / "simulation.sqlite3"
     if args.fresh:
         for suffix in ("", "-wal", "-shm"):
-            Path(str(database) + suffix).unlink(missing_ok=True)
+            try:
+                Path(str(database) + suffix).unlink(missing_ok=True)
+            except PermissionError:
+                print(f"{database.name} is in use: a previous lab run is still running. Close its terminal "
+                      "(or end the stray python/node processes), then retry.", file=sys.stderr)
+                return 1
     sim = f"http://127.0.0.1:{args.sim_port}"
     api = f"http://127.0.0.1:{args.api_port}"
     base = {**os.environ, "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost"}
@@ -60,6 +66,12 @@ def main() -> int:
                "KUBECONFIG": str(ROOT / ".local" / "simulation-no-kubeconfig"),
                "VERIFICATION_WINDOW_MINUTES": "2", "VERIFICATION_MINIMUM_SAMPLES": "3", "MONITOR_POLL_SECONDS": "5",
                "ALERTMANAGER_WEBHOOK_TOKEN": ""}
+    if args.real_model:
+        for key in ("LLM_MODEL", "LLM_API_KEY", "LLM_API_BASE", "LLM_FALLBACK_MODEL"):
+            api_env.pop(key, None)  # fall back to the process environment, then to .env
+            if key in os.environ:
+                api_env[key] = os.environ[key]
+        print("Using your configured model. Incident text, synthetic telemetry and synthetic source files are sent to that provider.", flush=True)
     web_env = {**base, "API_PROXY_TARGET": api, "SIM_PROXY_TARGET": sim, "NEXT_TELEMETRY_DISABLED": "1"}
     web_env.pop("NEXT_PUBLIC_API_BASE_URL", None)
     backend, frontend = str(ROOT / "backend"), str(ROOT / "frontend")
